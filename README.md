@@ -5,7 +5,7 @@
 
 - Application Link: https://fwks.shinyapps.io/stat503/
 - Developed by: Fatimah Albahar, Kholoud Almutairi, Shaymaa Khalaf, Waiam Malibari
-- Supervised by: Dr. Muhammad Riaz
+
 
 ## Introduction
 Statistical inference can be difficult to grasp when moving from theory to practice. To address this gap, we developed an all-in-one R Shiny app that helps students and practitioners explore descriptive statistics, probability distributions, sampling, and hypothesis testing. The app was built as part of our coursework with the aim of making statistical concepts more interactive and approachable.
