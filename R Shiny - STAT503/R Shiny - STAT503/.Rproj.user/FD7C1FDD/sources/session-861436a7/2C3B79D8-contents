@@ -1,0 +1,434 @@
+library(shiny)
+library(BSDA)
+library(EnvStats)
+
+ui <- fluidPage(
+  titlePanel("Statistical Inference App"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("test_type", "Select Test Type:",
+                  choices = c("Normality Check", "Location Parameter Test", "Variance Test", "Proportion Test")),
+      
+      # Normality Check Panel
+      conditionalPanel(
+        condition = "input.test_type == 'Normality Check'",
+        radioButtons("nc_data_source", "Data Source:",
+                     choices = c("Upload Dataset" = "file", "Built-in Dataset" = "builtin", "Manual Entry" = "manual"),
+                     selected = "file"),
+        conditionalPanel(
+          condition = "input.nc_data_source == 'file'",
+          fileInput("nc_file", "Upload CSV File"),
+          selectInput("nc_column", "Select Column", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.nc_data_source == 'builtin'",
+          selectInput("nc_dataset", "Choose Dataset:", choices = c("mtcars", "iris", "ToothGrowth")),
+          selectInput("nc_dataset_col", "Select Column", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.nc_data_source == 'manual'",
+          textAreaInput("nc_manual_data", "Enter Data (comma/space separated):", placeholder = "e.g., 98, 102, 101, 99")
+        )
+      ),
+      
+      # Mean Test Panel
+      conditionalPanel(
+        condition = "input.test_type == 'Location Parameter Test'",
+        radioButtons("mean_data_source", "Data Source:",
+                     choices = c("Upload Dataset" = "file", "Built-in Dataset" = "builtin", "Manual Entry" = "manual", "Summary Statistics" = "summary"),
+                     selected = "file"),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'file'",
+          fileInput("mean_file", "Upload CSV File"),
+          selectInput("mean_column", "Select Column", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'builtin'",
+          selectInput("mean_dataset", "Choose Dataset:", choices = c("mtcars", "iris", "ToothGrowth")),
+          selectInput("mean_dataset_col", "Select Column", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'manual'",
+          textAreaInput("mean_manual_data", "Enter Data (comma/space separated):", placeholder = "e.g., 98, 102, 101, 99")
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source != 'summary'",
+          selectInput("mean_test_type", "Select Test:", choices = c("Z-test", "t-test", "Wilcoxon signed-rank test"))
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'summary'",
+          selectInput("mean_test_type", "Select Test:", choices = c("Z-test", "t-test"))
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source != 'summary' && input.mean_test_type == 't-test'",
+          numericInput("mu0_ttest", "Hypothesized mean (μ₀)", value = 0)
+        ),
+        
+        conditionalPanel(
+          condition = "input.mean_data_source != 'summary' && input.mean_test_type == 'Wilcoxon signed-rank test'",
+          numericInput("m0_wtest", "Hypothesized median (m₀)", value = 0)
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source != 'summary' && input.mean_test_type == 'Z-test'",
+          numericInput("mu0_ztest", "Hypothesized mean (μ₀)", value = 0),
+          numericInput("sigma_ztest", "Population SD (σ)", value = 1)
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'summary'",
+          numericInput("n_mean", "Sample size (n)", value = 9),
+          numericInput("xbar", "Sample mean", value = 102),
+          numericInput("mu0", "Hypothesized mean (μ₀)", value = 100),
+          conditionalPanel(condition = "input.mean_test_type == 'Z-test'", numericInput("sigma", "Population SD (σ)", value = 2)),
+          conditionalPanel(condition = "input.mean_test_type == 't-test'", numericInput("s", "Sample SD (s)", value = 2))
+        )
+      ),
+      
+      
+      # Variance Test Panel
+      conditionalPanel(
+        condition = "input.test_type == 'Variance Test'",
+        radioButtons("var_data_source", "Data Source:",
+                     choices = c("Upload Dataset" = "file",
+                                 "Built-in Dataset" = "builtin",
+                                 "Manual Entry" = "manual"),
+                     selected = "file"),
+        conditionalPanel(
+          condition = "input.var_data_source == 'file'",
+          fileInput("var_file", "Upload CSV File"),
+          selectInput("var_column", "Select Column", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.var_data_source == 'builtin'",
+          selectInput("var_dataset", "Choose Dataset:",
+                      choices = c("mtcars", "iris", "ToothGrowth")),
+          selectInput("var_dataset_col", "Select Column", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.var_data_source == 'manual'",
+          textAreaInput("var_manual_data", "Enter Data (comma/space separated):",
+                        placeholder = "e.g., 98, 102, 101, 99")
+        ),
+        numericInput("sigma0_sq", "Hypothesized variance", value = 1)
+      ),
+      
+      # Proportion Test Panel
+      conditionalPanel(
+        condition = "input.test_type == 'Proportion Test'",
+        radioButtons("prop_data_source", "Data Source:",
+                     choices = c("Upload Dataset" = "file",
+                                 "Built-in Dataset" = "builtin",
+                                 "Manual Entry" = "manual",
+                                 "Summary Statistics" = "summary"),
+                     selected = "file"),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'file'",
+          fileInput("prop_file", "Upload CSV File"),
+          selectInput("prop_column", "Select Column", choices = NULL),
+          textInput("success_value", "Success Value", placeholder = "e.g., 1 or 'success'")
+        ),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'builtin'",
+          selectInput("prop_dataset", "Choose Dataset:",
+                      choices = c("mtcars", "iris", "ToothGrowth")),
+          selectInput("prop_dataset_col", "Select Column", choices = NULL),
+          textInput("prop_success_value", "Success Value", placeholder = "e.g., 1 or 'success'")
+        ),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'manual'",
+          textAreaInput("prop_manual_data", "Enter Successes (1) and Failures (0):",
+                        placeholder = "e.g., 1, 0, 1, 1, 0")
+        ),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'summary'",
+          numericInput("x_prop", "Number of successes (x)", value = 19),
+          numericInput("n_prop", "Sample size (n)", value = 200)
+        ),
+        numericInput("p0", "Hypothesized proportion", value = 0.1),
+        radioButtons("prop_test_type", "Test Type:",
+                     choices = c("Exact binomial test", 
+                                 "Approximate normal test"))
+      ),
+      
+      numericInput("alpha", "Significance level (α)", value = 0.05, min = 0, max = 1, step = 0.01),
+      conditionalPanel(
+        condition = "input.test_type != 'Normality Check'",
+        selectInput("alternative", "Alternative Hypothesis",
+                    choices = c("Two-sided" = "two.sided", "Less" = "less", "Greater" = "greater"))
+      ),
+      actionButton("run", "Calculate")
+    ),
+    mainPanel(verbatimTextOutput("result"), uiOutput("conclusion"))
+  )
+)
+
+server <- function(input, output, session) {
+  # --- dynamically update column selectors for uploaded files ---
+  observeEvent(input$nc_file, {
+    req(input$nc_file)
+    df <- read.csv(input$nc_file$datapath)
+    updateSelectInput(session, "nc_column", choices = names(df))
+  })
+  
+  observeEvent(input$mean_file, { req(input$mean_file); df <- read.csv(input$mean_file$datapath); updateSelectInput(session, "mean_column", choices = names(df)) })
+  
+  
+  observeEvent(input$var_file, {
+    req(input$var_file)
+    df <- read.csv(input$var_file$datapath)
+    updateSelectInput(session, "var_column", choices = names(df))
+  })
+  
+  observeEvent(input$prop_file, {
+    req(input$prop_file)
+    df <- read.csv(input$prop_file$datapath)
+    updateSelectInput(session, "prop_column", choices = names(df))
+  })
+  
+  # --- dynamically update column selectors for built-in datasets ---
+  observeEvent(input$nc_dataset, {
+    req(input$nc_dataset)
+    df <- get(input$nc_dataset)
+    updateSelectInput(session, "nc_dataset_col", choices = names(df))
+  })
+  
+  observeEvent(input$mean_dataset, { req(input$mean_dataset); df <- get(input$mean_dataset); updateSelectInput(session, "mean_dataset_col", choices = names(df)) })
+  
+  
+  observeEvent(input$var_dataset, {
+    req(input$var_dataset)
+    df <- get(input$var_dataset)
+    updateSelectInput(session, "var_dataset_col", choices = names(df))
+  })
+  
+  observeEvent(input$prop_dataset, {
+    req(input$prop_dataset)
+    df <- get(input$prop_dataset)
+    updateSelectInput(session, "prop_dataset_col", choices = names(df))
+  })
+  
+  
+  # Data handling for Normality Check
+  nc_data <- reactive({
+    req(input$test_type == "Normality Check")
+    if(input$nc_data_source == "file") {
+      req(input$nc_file, input$nc_column)
+      data <- read.csv(input$nc_file$datapath)
+      data[[input$nc_column]]
+    } else if(input$nc_data_source == "builtin") {
+      req(input$nc_dataset, input$nc_dataset_col)
+      data <- get(input$nc_dataset)
+      data[[input$nc_dataset_col]]
+    } else if(input$nc_data_source == "manual") {
+      req(input$nc_manual_data)
+      values <- as.numeric(unlist(strsplit(input$nc_manual_data, "[, \n]+")))
+      validate(need(!any(is.na(values)), "Invalid data input"))
+      values
+    }
+  })
+  
+  # Data handling for Mean Test
+  mean_data <- reactive({
+    req(input$test_type == "Location Parameter Test")
+    if (input$mean_data_source == "file") {
+      req(input$mean_file, input$mean_column)
+      read.csv(input$mean_file$datapath)[[input$mean_column]]
+    } else if (input$mean_data_source == "builtin") {
+      req(input$mean_dataset, input$mean_dataset_col)
+      get(input$mean_dataset)[[input$mean_dataset_col]]
+    } else if (input$mean_data_source == "manual") {
+      req(input$mean_manual_data)
+      vals <- as.numeric(unlist(strsplit(input$mean_manual_data, "[, \n]+")))
+      validate(need(!any(is.na(vals)), "Invalid manual input"))
+      vals
+    } else NULL
+  })
+  
+  test_result <- reactiveVal(NULL)
+  
+  # Data handling for Variance Test
+  var_data <- reactive({
+    req(input$test_type == "Variance Test")
+    if(input$var_data_source == "file") {
+      req(input$var_file, input$var_column)
+      data <- read.csv(input$var_file$datapath)
+      data[[input$var_column]]
+    } else if(input$var_data_source == "builtin") {
+      req(input$var_dataset, input$var_dataset_col)
+      data <- get(input$var_dataset)
+      data[[input$var_dataset_col]]
+    } else if(input$var_data_source == "manual") {
+      req(input$var_manual_data)
+      values <- as.numeric(unlist(strsplit(input$var_manual_data, "[, \n]+")))
+      validate(need(!any(is.na(values)), "Invalid data input"))
+      values
+    }
+  })
+  
+  # Data handling for Proportion Test
+  prop_data <- reactive({
+    req(input$test_type == "Proportion Test")
+    if(input$prop_data_source == "file") {
+      req(input$prop_file, input$prop_column, input$success_value)
+      data <- read.csv(input$prop_file$datapath)
+      values <- data[[input$prop_column]]
+      if(is.numeric(values)) {
+        successes <- sum(values == as.numeric(input$success_value))
+      } else {
+        successes <- sum(values == input$success_value)
+      }
+      return(list(x = successes, n = length(values)))
+    } else if(input$prop_data_source == "builtin") {
+      req(input$prop_dataset, input$prop_dataset_col, input$prop_success_value)
+      data <- get(input$prop_dataset)
+      values <- data[[input$prop_dataset_col]]
+      if(is.numeric(values)) {
+        successes <- sum(values == as.numeric(input$prop_success_value))
+      } else {
+        successes <- sum(values == input$prop_success_value)
+      }
+      return(list(x = successes, n = length(values)))
+    } else if(input$prop_data_source == "manual") {
+      req(input$prop_manual_data)
+      values <- as.numeric(unlist(strsplit(input$prop_manual_data, "[, \n]+")))
+      validate(need(all(values %in% c(0,1)), "Data must be 0s and 1s"))
+      return(list(x = sum(values), n = length(values)))
+    } else if(input$prop_data_source == "summary") {
+      return(list(x = input$x_prop, n = input$n_prop))
+    }
+  })
+  
+  observeEvent(input$run, {
+    tryCatch({
+      if(input$test_type == "Normality Check") {
+        data <- nc_data()
+        test <- shapiro.test(data)
+        test_result(test)
+        output$result <- renderPrint({
+          list(
+            Test_Results = test,
+            Data_Summary = summary(data),
+            Data_Preview = head(data) 
+          )
+        })
+      }
+      
+      else if (input$test_type == "Location Parameter Test") {
+        mu_val <- if (input$mean_data_source == "summary") input$mu0 else if (input$mean_test_type == "Z-test") input$mu0_ztest else if (input$mean_test_type == "t-test") input$mu0_ttest else input$m0_wtest
+        if (input$mean_data_source == "summary") {
+          if (input$mean_test_type == "Z-test") {
+            test <- zsum.test(mean.x = input$xbar, sigma.x = input$sigma, n.x = input$n_mean, mu = input$mu0, alternative = input$alternative, conf.level = 1 - input$alpha)
+          } else {
+            test <- tsum.test(mean.x = input$xbar, s.x = input$s, n.x = input$n_mean, mu = input$mu0, alternative = input$alternative, conf.level = 1 - input$alpha)
+          }
+        } else {
+          data <- mean_data()
+          if (input$mean_test_type == "Z-test") {
+            test <- z.test(data, mu = mu_val, sigma.x = input$sigma_ztest, alternative = input$alternative, conf.level = 1 - input$alpha)
+          } else if (input$mean_test_type == "t-test") {
+            test <- t.test(data, mu = mu_val, alternative = input$alternative, conf.level = 1 - input$alpha)
+          } else {
+            test <- wilcox.test(data, mu= mu_val, alternative = input$alternative, conf.int = TRUE, conf.level = 1 - input$alpha)
+          }
+        }
+        test_result(test)
+        output$result <- renderPrint(test)
+      }
+      else if(input$test_type == "Variance Test") {
+        data <- var_data()
+        validate(need(length(data) >= 2, "Need at least 2 observations for variance test"))
+        test <- varTest(data, sigma.squared = input$sigma0_sq, 
+                        alternative = input$alternative, 
+                        conf.level = 1 - input$alpha)
+        test_result(test)
+        output$result <- renderPrint(test)
+      }
+      else if(input$test_type == "Proportion Test") {
+        if (input$prop_data_source == "summary"){
+          if(input$prop_test_type == "Exact binomial test") {
+            test <- binom.test(x = input$x_prop, n = input$n_prop, p = input$p0,
+                               alternative = input$alternative,
+                               conf.level = 1 - input$alpha)
+          } else {
+            test <- prop.test(x = input$x_prop, n = input$n_prop, p = input$p0,
+                              alternative = input$alternative,
+                              conf.level = 1 - input$alpha)
+          }
+        }
+        else{
+          data <- prop_data()
+          if(input$prop_test_type == "Exact binomial test") {
+            test <- binom.test(x = data$x, n = data$n, p = input$p0,
+                               alternative = input$alternative,
+                               conf.level = 1 - input$alpha)
+          } else {
+            test <- prop.test(x = data$x, n = data$n, p = input$p0,
+                              alternative = input$alternative,
+                              conf.level = 1 - input$alpha)
+          }
+        }
+        
+        test_result(test)
+        output$result <- renderPrint(test)
+      }
+      
+      # Generate conclusion
+      output$conclusion <- renderUI({
+        req(test_result())
+        test <- test_result()
+        pval <- test$p.value
+        ci <- if (!is.null(test$conf.int)) test$conf.int else c(NA, NA)
+        if (input$test_type == "Location Parameter Test"){
+          mu_val <- if (input$mean_data_source == "summary") input$mu0 else if (input$mean_test_type == "Z-test") input$mu0_ztest else input$mu0_ttest
+          conclusion <- if (pval < input$alpha) {
+            paste0("Reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          } else {
+            paste0("Fail to reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          }
+          
+          if (!is.null(ci) && all(!is.na(ci))) {
+            ci_text <- paste0("[", round(ci[1], 4), ", ", round(ci[2], 4), "]")
+            inside <- if (mu_val >= ci[1] && mu_val <= ci[2]) "INSIDE" else "OUTSIDE"
+            conclusion <- paste(conclusion, paste0("\nH₀ value ", mu_val, " is ", inside, " the ", (1 - input$alpha)*100, "% CI ", ci_text))
+          }
+        } else if(input$test_type == "Variance Test"){
+          conclusion <- if (pval < input$alpha) {
+            paste0("Reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          } else {
+            paste0("Fail to reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          }
+          
+          if (!is.null(ci) && all(!is.na(ci))) {
+            ci_text <- paste0("[", round(ci[1], 4), ", ", round(ci[2], 4), "]")
+            inside <- if (input$sigma0_sq >= ci[1] && input$sigma0_sq <= ci[2]) "INSIDE" else "OUTSIDE"
+            conclusion <- paste(conclusion, paste0("\nH₀ value ", input$sigma0_sq, " is ", inside, " the ", (1 - input$alpha)*100, "% CI ", ci_text))
+          }
+        } else if(input$test_type == "Proportion Test"){
+          conclusion <- if (pval < input$alpha) {
+            paste0("Reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          } else {
+            paste0("Fail to reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          }
+          
+          if (!is.null(ci) && all(!is.na(ci))) {
+            ci_text <- paste0("[", round(ci[1], 4), ", ", round(ci[2], 4), "]")
+            inside <- if (input$p0 >= ci[1] && input$p0 <= ci[2]) "INSIDE" else "OUTSIDE"
+            conclusion <- paste(conclusion, paste0("\nH₀ value ", input$p0, " is ", inside, " the ", (1 - input$alpha)*100, "% CI ", ci_text))
+          }
+        } else if (input$test_type == "Normality Check"){
+          conclusion <- if (pval < input$alpha) {
+            paste0("Reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          } else {
+            paste0("Fail to reject H₀ at α = ", input$alpha, " (p = ", round(pval, 4), ")")
+          }
+          
+          
+          }
+        
+        
+        HTML(gsub("\n", "<br>", conclusion))
+      })
+    })
+  })
+}
+
+shinyApp(ui, server)

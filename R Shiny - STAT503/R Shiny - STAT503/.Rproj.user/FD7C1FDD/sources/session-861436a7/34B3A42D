@@ -1,0 +1,26 @@
+{
+    "id": "34B3A42D",
+    "path": "~/Documents/R Shiny - STAT503/STAT503/app.R",
+    "project_path": "STAT503/app.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1746342018754.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "211,58",
+        "scrollLine": "199"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1746352228,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1746352228585,
+    "read_only": false,
+    "read_only_alternatives": []
+}

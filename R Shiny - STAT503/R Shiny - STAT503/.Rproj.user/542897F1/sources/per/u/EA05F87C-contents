@@ -1,0 +1,7 @@
+# 1) Using data()
+data(package = "datasets")
+# → shows a table; to extract just the names:
+data(package = "datasets")$results[, "Item"]
+
+
+data()

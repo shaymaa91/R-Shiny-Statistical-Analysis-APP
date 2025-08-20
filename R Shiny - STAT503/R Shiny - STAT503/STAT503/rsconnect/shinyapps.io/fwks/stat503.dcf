@@ -1,0 +1,10 @@
+name: stat503
+title:
+username: fwks
+account: fwks
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 14766377
+bundleId: 10319604
+url: https://fwks.shinyapps.io/stat503/
+version: 1

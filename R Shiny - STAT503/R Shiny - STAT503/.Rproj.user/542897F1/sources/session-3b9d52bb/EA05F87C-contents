@@ -1,0 +1,3 @@
+data(abbey)
+head(abbey)
+summary(abbey)

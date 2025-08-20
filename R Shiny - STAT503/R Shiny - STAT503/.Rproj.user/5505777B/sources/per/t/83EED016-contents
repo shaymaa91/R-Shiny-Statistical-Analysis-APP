@@ -1,0 +1,399 @@
+library(shiny)
+library(BSDA)
+library(EnvStats)
+library(stats)
+library(DescTools)
+
+ui <- fluidPage(
+  titlePanel("Two-Sample Statistical Inference App"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("two_test_type", "Select Test Type:",
+                  choices = c(
+                    "Normality Check",          
+                    "Two-Sample Mean Test",
+                    "Two-Sample Variance Test",
+                    "Two-Sample Proportion Test"
+                  )
+      ),
+      
+      ## -------------------- Normality Check -------------------- ##
+      conditionalPanel(
+        condition = "input.two_test_type == 'Normality Check'",
+        radioButtons("nc_data_source", "Data Source:",
+                     choices = c("Upload Files" = "file",
+                                 "Built-in Datasets" = "builtin",
+                                 "Manual Entry"     = "manual"),
+                     selected = "file"
+        ),
+        conditionalPanel(
+          condition = "input.nc_data_source == 'file'",
+          fileInput("nc_file", "Upload CSV with both samples (two columns)"),
+          selectInput("nc_column1", "Select Column for Sample X", choices = NULL),
+          selectInput("nc_column2", "Select Column for Sample Y", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.nc_data_source == 'builtin'",
+          selectInput("nc_dataset",    "Choose Dataset:",    choices = c("mtcars","iris","ToothGrowth")),
+          selectInput("nc_dataset_col1","Column for Sample X", choices = NULL),
+          selectInput("nc_dataset_col2","Column for Sample Y", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.nc_data_source == 'manual'",
+          textAreaInput("nc_manual1", "Enter Sample X", placeholder = "e.g. 2,3,5,7,..."),
+          textAreaInput("nc_manual2", "Enter Sample Y", placeholder = "e.g. 5,7,8,9,...")
+        )
+      ),
+      
+      ## ---------------- Two-Sample Mean Test ------------------ ##
+      conditionalPanel(
+        condition = "input.two_test_type == 'Two-Sample Mean Test'",
+        radioButtons("mean_data_source", "Data Source:",
+                     choices = c("Upload Files"     = "file",
+                                 "Built-in Datasets"= "builtin",
+                                 "Manual Entry"     = "manual",
+                                 "Summary Statistics"= "summary"),
+                     selected = "file"
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'file'",
+          fileInput("mean_file", "Upload CSV with both samples (two columns)"),
+          selectInput("mean_col1", "Column for Sample X", choices = NULL),
+          selectInput("mean_col2", "Column for Sample Y", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'builtin'",
+          selectInput("mean_dataset", "Choose Dataset:", choices = c("mtcars","iris","ToothGrowth")),
+          selectInput("mean_dataset_col1", "Column for Sample X", choices = NULL),
+          selectInput("mean_dataset_col2", "Column for Sample Y", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'manual'",
+          textAreaInput("mean_manual1", "Enter Data X", placeholder = "e.g. 2,3,5,7,..."),
+          textAreaInput("mean_manual2", "Enter Data Y", placeholder = "e.g. 5,7,8,9,...")
+        ),
+        conditionalPanel(
+          condition = "input.mean_data_source == 'summary'",
+          h4("Summary Sample X"),
+          numericInput("n1", "n₁", value = 10, min = 1),
+          numericInput("xbar1", "x̄₁", value = 5),
+          radioButtons("sig1_known", "σ₁ known?", choices = c("Yes","No"), selected = "No"),
+          conditionalPanel("input.sig1_known == 'Yes'", numericInput("sigma1", "σ₁", value = 1)),
+          conditionalPanel("input.sig1_known == 'No'", numericInput("s1", "s₁", value = 1)),
+          h4("Summary Sample Y"),
+          numericInput("n2", "n₂", value = 10, min = 1),
+          numericInput("xbar2", "x̄₂", value = 6),
+          radioButtons("sig2_known", "σ₂ known?", choices = c("Yes","No"), selected = "No"),
+          conditionalPanel("input.sig2_known == 'Yes'", numericInput("sigma2", "σ₂", value = 1)),
+          conditionalPanel("input.sig2_known == 'No'", numericInput("s2", "s₂", value = 1))
+        ),
+        numericInput("mu0_diff", "H₀: μ₁ – μ₂ =", value = 0),
+        selectInput("mean_two_test_type", "Select Test:",
+                    choices = c("Z-test (indep)", "t-test equal var", "Welch t-test",
+                                "Paired t-test", "Wilcoxon (indep)", "Wilcoxon paired")
+        ),
+        conditionalPanel(
+          condition = "input.mean_two_test_type == 'Z-test (indep)' && input.mean_data_source != 'summary'",
+          numericInput("sigma_z1", "σ₁", value = 1),
+          numericInput("sigma_z2", "σ₂", value = 1)
+        )
+      ),
+      
+      ## ------------- Two-Sample Variance Test ---------------- ##
+      conditionalPanel(
+        condition = "input.two_test_type == 'Two-Sample Variance Test'",
+        radioButtons("var_data_source", "Data Source:",
+                     choices = c("Upload Files" = "file",
+                                 "Built-in"     = "builtin",
+                                 "Manual Entry" = "manual",
+                                 "Summary"      = "summary"),
+                     selected = "file"
+        ),
+        conditionalPanel(
+          condition = "input.var_data_source == 'file'",
+          fileInput("var_file", "Upload CSV with both samples (two columns)"),
+          selectInput("var_col1", "Column for Sample X", choices = NULL),
+          selectInput("var_col2", "Column for Sample Y", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.var_data_source == 'builtin'",
+          selectInput("var_dataset", "Choose Dataset:", choices = c("mtcars","iris","ToothGrowth")),
+          selectInput("var_dataset_col1", "Column for Sample X", choices = NULL),
+          selectInput("var_dataset_col2", "Column for Sample Y", choices = NULL)
+        ),
+        conditionalPanel(
+          condition = "input.var_data_source == 'manual'",
+          textAreaInput("var_manual1", "Enter Data X"),
+          textAreaInput("var_manual2", "Enter Data Y")
+        ),
+        conditionalPanel(
+          condition = "input.var_data_source == 'summary'",
+          numericInput("n1_v", "n₁", value = 10, min = 1),
+          numericInput("s1_sq", "s₁²", value = 1),
+          numericInput("n2_v", "n₂", value = 10, min = 1),
+          numericInput("s2_sq", "s₂²", value = 1)
+        ),
+        numericInput("theta0", "H₀: σ₁²/σ₂² =", value = 1),
+        selectInput("var_two_test_type", "Select Test:", choices = c("F-test","Mood's test"))
+      ),
+      
+      ## -------- Two-Sample Proportion Test ---------------- ##
+      conditionalPanel(
+        condition = "input.two_test_type == 'Two-Sample Proportion Test'",
+        radioButtons("prop_data_source", "Data Source:",
+                     choices = c("Upload Files"   = "file",
+                                 "Built-in"       = "builtin",
+                                 "Manual Entry"   = "manual",
+                                 "Summary"        = "summary"),
+                     selected = "file"
+        ),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'file'",
+          fileInput("prop_file", "Upload CSV"),
+          selectInput("prop_col", "Select Column", choices = NULL),
+          textInput("success_value", "Success Value", placeholder = "e.g. 1 or 'yes'")
+        ),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'builtin'",
+          selectInput("prop_dataset", "Choose Dataset:", choices = c("mtcars","iris","ToothGrowth")),
+          selectInput("prop_dataset_col", "Select Column", choices = NULL),
+          textInput("prop_success_value", "Success Value", placeholder = "e.g. 1 or 'yes'")
+        ),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'manual'",
+          textAreaInput("prop_manual", "Enter 0/1 data", placeholder = "e.g. 1,0,1,1,0")
+        ),
+        conditionalPanel(
+          condition = "input.prop_data_source == 'summary'",
+          numericInput("x_prop", "Number of successes (x)", value = 19),
+          numericInput("n_prop", "Sample size (n)", value = 200)
+        ),
+        numericInput("p0", "H₀: p =", value = 0.1),
+        selectInput("prop_two_test_type", "Select Test:", choices = c("Exact binomial test","Approximate normal test"))
+      ),
+      
+      numericInput("alpha", "Significance level (α)", value = 0.05, min = 0, max = 1, step = 0.01),
+      conditionalPanel(
+        condition = "input.two_test_type != 'Normality Check'",
+        selectInput("alternative", "Alternative Hypothesis",
+                    choices = c("Two-sided"="two.sided", "Less"="less", "Greater"="greater"))
+      ),
+      
+      actionButton("run_two", "Run Test")
+    ),
+    
+    mainPanel(
+      verbatimTextOutput("result_two"),
+      uiOutput("conclusion_two")
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  
+  # --- dynamically populate column selects on upload or builtin ---
+  observeEvent(input$nc_file, {
+    req(input$nc_file)
+    cols <- names(read.csv(input$nc_file$datapath))
+    updateSelectInput(session, "nc_column1", choices = cols)
+    updateSelectInput(session, "nc_column2", choices = cols)
+  })
+  observeEvent(input$nc_dataset, {
+    df <- get(input$nc_dataset)
+    updateSelectInput(session, "nc_dataset_col1", choices = names(df))
+    updateSelectInput(session, "nc_dataset_col2", choices = names(df))
+  })
+  
+  observeEvent(input$mean_file, {
+    req(input$mean_file)
+    cols <- names(read.csv(input$mean_file$datapath))
+    updateSelectInput(session, "mean_col1", choices = cols)
+    updateSelectInput(session, "mean_col2", choices = cols)
+  })
+  observeEvent(input$mean_dataset, {
+    df <- get(input$mean_dataset)
+    updateSelectInput(session, "mean_dataset_col1", choices = names(df))
+    updateSelectInput(session, "mean_dataset_col2", choices = names(df))
+  })
+  
+  observeEvent(input$var_file, {
+    req(input$var_file)
+    cols <- names(read.csv(input$var_file$datapath))
+    updateSelectInput(session, "var_col1", choices = cols)
+    updateSelectInput(session, "var_col2", choices = cols)
+  })
+  observeEvent(input$var_dataset, {
+    df <- get(input$var_dataset)
+    updateSelectInput(session, "var_dataset_col1", choices = names(df))
+    updateSelectInput(session, "var_dataset_col2", choices = names(df))
+  })
+  
+  observeEvent(input$prop_file, {
+    req(input$prop_file)
+    cols <- names(read.csv(input$prop_file$datapath))
+    updateSelectInput(session, "prop_col", choices = cols)
+  })
+  observeEvent(input$prop_dataset, {
+    df <- get(input$prop_dataset)
+    updateSelectInput(session, "prop_dataset_col", choices = names(df))
+  })
+  
+  # --- helper to pull x & y from any of the three sources ---
+  get_samples <- function(src, file, col1, col2, ds, ds1, ds2, man1, man2) {
+    if (src == "file") {
+      df <- read.csv(file$datapath)
+      x  <- df[[col1]] 
+      y  <- df[[col2]]
+    } else if (src == "builtin") {
+      d  <- get(ds)
+      x  <- d[[ds1]]
+      y  <- d[[ds2]]
+    } else {
+      x  <- as.numeric(strsplit(man1, "[, \\n]+")[[1]])
+      y  <- as.numeric(strsplit(man2, "[, \\n]+")[[1]])
+    }
+    list(x = x, y = y)
+  }
+  
+  observeEvent(input$run_two, {
+    
+    α   <- input$alpha
+    alt <- if (is.null(input$alternative)) "two.sided" else input$alternative
+    res <- NULL
+    concl <- NULL
+    
+    # ---- Normality Check ----
+    if (input$two_test_type == "Normality Check") {
+      d <- get_samples(
+        input$nc_data_source,
+        input$nc_file,           # fileInput obj
+        input$nc_column1,        # col for X
+        input$nc_column2,        # col for Y
+        input$nc_dataset,        # dataset name
+        input$nc_dataset_col1,   # col for X
+        input$nc_dataset_col2,   # col for Y
+        input$nc_manual1,
+        input$nc_manual2
+      )
+      t1 <- shapiro.test(d$x)
+      t2 <- shapiro.test(d$y)
+      res <- list(SampleX = t1, SampleY = t2)
+      concl <- paste0(
+        "<ul>",
+        "<li><b>X normal?</b> ", if (t1$p.value > α) "yes" else "no", "</li>",
+        "<li><b>Y normal?</b> ", if (t2$p.value > α) "yes" else "no", "</li>",
+        "</ul>"
+      )
+    }
+    
+    # ---- Two-Sample Mean Test ----
+    else if (input$two_test_type == "Two-Sample Mean Test") {
+      
+      # summary-stat branch
+      if (input$mean_data_source == "summary") {
+        if (input$mean_two_test_type == "Z-test (indep)" && input$sig1_known=="Yes" && input$sig2_known=="Yes") {
+          z <- zsum.test(
+            mean.x = input$xbar1, sigma.x = input$sigma1, n.x = input$n1,
+            mean.y = input$xbar2, sigma.y = input$sigma2, n.y = input$n2,
+            mu = input$mu0_diff, alternative = alt, conf.level = 1 - α
+          )
+          res <- z
+        } else {
+          t <- tsum.test(
+            mean.x = input$xbar1, s.x = input$s1, n.x = input$n1,
+            mean.y = input$xbar2, s.y = input$s2, n.y = input$n2,
+            mu = input$mu0_diff, alternative = alt, conf.level = 1 - α
+          )
+          res <- t
+        }
+      }
+      
+      # raw-data branch
+      else {
+        d  <- get_samples(
+          input$mean_data_source,
+          input$mean_file,
+          input$mean_col1,
+          input$mean_col2,
+          input$mean_dataset,
+          input$mean_dataset_col1,
+          input$mean_dataset_col2,
+          input$mean_manual1,
+          input$mean_manual2
+        )
+        x  <- d$x; y <- d$y
+        res <- switch(input$mean_two_test_type,
+                      `Z-test (indep)`   = z.test(x, y,
+                                                  sigma.x = input$sigma_z1, sigma.y = input$sigma_z2,
+                                                  mu = input$mu0_diff, alternative = alt, conf.level = 1-α),
+                      `t-test equal var` = t.test(x, y, var.equal = TRUE,
+                                                  mu = input$mu0_diff, alternative = alt, conf.level = 1-α),
+                      `Welch t-test`     = t.test(x, y, var.equal = FALSE,
+                                                  mu = input$mu0_diff, alternative = alt, conf.level = 1-α),
+                      `Paired t-test`    = t.test(x, y, paired = TRUE,
+                                                  mu = input$mu0_diff, alternative = alt, conf.level = 1-α),
+                      `Wilcoxon (indep)` = wilcox.test(x, y,
+                                                       alternative = alt, conf.int = TRUE, conf.level = 1-α),
+                      `Wilcoxon paired` = wilcox.test(x, y, paired = TRUE,
+                                                      alternative = alt, conf.int = TRUE, conf.level = 1-α)
+        )
+      }
+      
+      concl <- if (res$p.value < α) "Reject H₀" else "Fail to reject H₀"
+    }
+    
+    # ---- Two-Sample Variance Test ----
+    else if (input$two_test_type == "Two-Sample Variance Test") {
+      d <- get_samples(
+        input$var_data_source,
+        input$var_file,
+        input$var_col1,
+        input$var_col2,
+        input$var_dataset,
+        input$var_dataset_col1,
+        input$var_dataset_col2,
+        input$var_manual1,
+        input$var_manual2
+      )
+      x <- d$x; y <- d$y
+      res <- switch(input$var_two_test_type,
+                    `F-test`     = var.test(x, y, ratio = input$theta0, alternative = alt, conf.level = 1-α),
+                    `Mood's test`= mood.test(x, y, alternative = alt, conf.int = TRUE, conf.level = 1-α)
+      )
+      concl <- if (res$p.value < α) "Reject H₀" else "Fail to reject H₀"
+    }
+    
+    # ---- Two-Sample Proportion Test ----
+    else if (input$two_test_type == "Two-Sample Proportion Test") {
+      # build x,n from whichever source
+      if (input$prop_data_source == "summary") {
+        x <- input$x_prop; n <- input$n_prop
+      } else if (input$prop_data_source == "builtin") {
+        df <- get(input$prop_dataset)
+        vals <- df[[input$prop_dataset_col]]
+        target <- if (is.numeric(vals)) as.numeric(input$prop_success_value) else input$prop_success_value
+        x <- sum(vals == target); n <- length(vals)
+      } else if (input$prop_data_source == "file") {
+        df <- read.csv(input$prop_file$datapath)
+        vals <- df[[input$prop_col]]
+        target <- if (is.numeric(vals)) as.numeric(input$success_value) else input$success_value
+        x <- sum(vals == target); n <- length(vals)
+      } else {
+        vals <- as.numeric(strsplit(input$prop_manual, "[, \\n]+")[[1]])
+        x <- sum(vals == 1); n <- length(vals)
+      }
+      
+      if (input$prop_two_test_type == "Exact binomial test") {
+        res <- binom.test(x = x, n = n, p = input$p0, alternative = alt, conf.level = 1-α)
+      } else {
+        res <- prop.test(x = x, n = n, p = input$p0, alternative = alt, conf.level = 1-α)
+      }
+      concl <- if (res$p.value < α) "Reject H₀" else "Fail to reject H₀"
+    }
+    
+    output$result_two     <- renderPrint(res)
+    output$conclusion_two <- renderUI(HTML(paste0("<b>Conclusion:</b> ", concl)))
+  })
+}
+
+shinyApp(ui, server)
