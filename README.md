@@ -2,7 +2,7 @@
 
 ![System Diagram](./App%20interface.png)
 
--[Application Link](https://fwks.shinyapps.io/stat503/)
+
 - Application Link: https://fwks.shinyapps.io/stat503/
 - Developed by: Fatimah Albahar, Kholoud Almutairi, Shaymaa Khalaf, Waiam Malibari
 - Supervised by: Dr. Muhammad Riaz
